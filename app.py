@@ -24,7 +24,7 @@ with col2:
 
 urheilijan_tavoite = st.text_input("Päätavoite", placeholder="Esim. Maratonin aikatavoite tai peruskunnon ylläpito")
 urheilijan_rajoitteet = st.text_input("Aikataulut ja laiterajoitteet (vapaaehtoinen)", 
-                                      placeholder="Esim. Juoksu mieluiten torstai-aamupäivisin ja crossfit lauantai-aamupäivisin. Kävelymatolla vain kävelyä, ei juoksua.")
+                                      placeholder="Esim. Juoksu mieluiten torstai-aamupäivisin ja crossfit lauantai-aamupäivisin.")
 
 # 3. TOIMINNON VALINTA
 st.subheader("2. Valitse valmennuksen tyyppi")
