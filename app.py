@@ -5,37 +5,41 @@ from datetime import datetime, timedelta
 import json
 
 st.set_page_config(page_title="Tekoälyvalmentaja", page_icon="🏃‍♂️")
-st.title("Tekoälyvalmentaja (Yleinen versio)")
-st.write("Tuo oma Intervals.icu -datasi ja kerro taustasi, niin valmentaja räätälöi analyysin sinulle.")
+st.title("Tekoälyvalmentaja")
+st.write("Tuo oma Intervals.icu -datasi. Valmentaja analysoi kuormituksesi ja laatii halutessasi 4 viikon ohjelman.")
 
-# 1. AVAIMET JA TUNNUKSET (Tyhjät kentät uusille käyttäjille)
+# 1. AVAIMET JA TUNNUKSET (Kysytään aina käyttäjältä)
 st.sidebar.subheader("Asetukset")
 api_key = st.sidebar.text_input("Syötä Gemini API-avain", type="password")
 athlete_id = st.sidebar.text_input("Intervals.icu Athlete ID")
 intervals_api_key = st.sidebar.text_input("Intervals.icu API Key", type="password")
 
-# 2. KÄYTTÄJÄN OMA PROFIILI (Uusi dynaaminen osio)
-st.subheader("1. Kerro taustasi")
+# 2. KÄYTTÄJÄN OMA PROFIILI JA TAVOITTEET
+st.subheader("1. Kerro taustasi ja tavoitteesi")
 col1, col2 = st.columns(2)
 with col1:
-    urheilijan_tyo = st.text_input("Työ / Elämäntilanne", placeholder="Esim. Istumatyö 8-16 tai 24h vuorotyö")
+    urheilijan_tyo = st.text_input("Työ / Elämäntilanne", placeholder="Esim. 24h vuorotyö tai 8-16 toimistotyö")
 with col2:
-    urheilijan_lajit = st.text_input("Lajitausta", placeholder="Esim. Triathlon, kuntosali, tennis")
+    urheilijan_lajit = st.text_input("Lajitausta", placeholder="Esim. Tennis, uinti, kestävyysjuoksu")
 
-urheilijan_tavoite = st.text_input("Päätavoite", placeholder="Esim. Peruskunnon kohotus tai maraton alle 4h")
+urheilijan_tavoite = st.text_input("Päätavoite", placeholder="Esim. Maratonin aikatavoite tai peruskunnon ylläpito")
+urheilijan_rajoitteet = st.text_input("Aikataulut ja laiterajoitteet (vapaaehtoinen)", 
+                                      placeholder="Esim. Juoksu mieluiten torstai-aamupäivisin ja crossfit lauantai-aamupäivisin. Kävelymatolla vain kävelyä, ei juoksua.")
 
-# 3. KYSYMYSKENTTÄ
-st.subheader("2. Kysymys valmentajalle")
-user_query = st.text_area("Mitä haluat tietää?", 
-                          placeholder="Esim. 'Olenko palautunut tarpeeksi huomista kovaa vetotreeniä varten?'")
+# 3. TOIMINNON VALINTA
+st.subheader("2. Valitse valmennuksen tyyppi")
+toiminto = st.radio("Mitä haluat valmentajan tekevän?", 
+                    ["Analysoi nykytilanne ja anna lyhyt suositus", 
+                     "Luo 4 viikon harjoitusohjelma"])
 
-if st.button("Hae historia ja analysoi"):
+user_query = st.text_area("Lisäkysymykset tai toiveet (vapaaehtoinen)", 
+                          placeholder="Esim. 'Huomioi, että ensi viikonloppuna en ehdi treenata lainkaan.'")
+
+if st.button("Hae data ja luo analyysi"):
     if not api_key or not athlete_id or not intervals_api_key:
         st.error("Syötä kaikki kolme tunnusta vasemman reunan sivupalkkiin!")
-    elif not user_query:
-        st.warning("Kirjoita kysymys valmentajalle.")
     else:
-        with st.spinner('Yhdistetään Intervals.icu-palveluun ja lasketaan kuormitusmalleja...'):
+        with st.spinner('Yhdistetään Intervals.icu-palveluun ja luodaan sisältöä...'):
             try:
                 # HAETAAN DATA RAJAPINNASTA
                 tanaan = datetime.now()
@@ -83,20 +87,39 @@ if st.button("Hae historia ja analysoi"):
                         "kuormitus_pisteet": kuorma
                     })
 
-                # TEKOÄLYN INTEGRAATIO JA DYNAAMINEN PROFIILI
+                # TEKOÄLYN INTEGRAATIO
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel('gemini-2.5-flash')
                 
-                # Varmistetaan, että tyhjät kentät eivät sekoita tekoälyä
+                # Oletusarvot tyhjille kentille
                 tausta_tyo = urheilijan_tyo if urheilijan_tyo else "Ei erikseen määritelty"
                 tausta_lajit = urheilijan_lajit if urheilijan_lajit else "Yleinen liikunta"
                 tausta_tavoite = urheilijan_tavoite if urheilijan_tavoite else "Terveys ja hyvinvointi"
+                tausta_rajoitteet = urheilijan_rajoitteet if urheilijan_rajoitteet else "Ei erityisiä rajoitteita"
+                lisakysymys = user_query if user_query else "Ei lisättyjä toiveita."
+                
+                # Muutetaan tekoälyn tehtävänantoa valinnan mukaan
+                if toiminto == "Luo 4 viikon harjoitusohjelma":
+                    tehtavananto = """
+                    Laadi urheilijalle selkeä 4 viikon harjoitusohjelma taulukkomuodossa. 
+                    - Viikko 1 alkaa välittömästi nykyisestä kuormitustilasta. Jos urheilija on ylirasittunut, aloita kevyesti.
+                    - Jaa jokainen viikko päiväkohtaisesti (Maanantai-Sunnuntai).
+                    - Määrittele jokaiselle treenille kesto, laji ja intensiteetti.
+                    - Huomioi ehdottomasti urheilijan tavoite, aikataulurajoitteet ja laitetoiveet.
+                    - Perustele lyhyesti ohjelman lopussa, miksi ohjelma on rytmitetty näin suhteessa pohjakuntoon.
+                    """
+                else:
+                    tehtavananto = """
+                    Anna ytimekäs, puhtaasti dataan perustuva fysiologinen analyysi ja ehdotus seuraavista askeleista 
+                    (tälle ja huomiselle päivälle). Arvioi akuutin kuorman suhdetta krooniseen pohjaan ja peilaa sitä tavoitteeseen.
+                    """
                 
                 prompt = f"""
                 Olet ammattitason urheiluvalmentaja. Ota analyysissä aina huomioon urheilijan antamat taustatiedot:
                 - Työ ja elämäntilanne: {tausta_tyo}
                 - Lajivalikoima: {tausta_lajit}
                 - Tavoite: {tausta_tavoite}
+                - Rajoitteet ja aikataulut: {tausta_rajoitteet}
                 
                 Urheilijan reaaliaikainen fysiologinen kuormitusdata:
                 - Akuutti treenimäärä (viimeiset 7 pv): {round(akuutti_kesto / 60, 1)} tuntia (Kokonaiskuorma: {round(akuutti_kuorma)} pistettä)
@@ -105,15 +128,15 @@ if st.button("Hae historia ja analysoi"):
                 Alla on eriteltynä lista hänen viimeisimmistä harjoituksistaan viimeisen 30 päivän ajalta:
                 {json.dumps(yhteenveto_lista, indent=2)}
                 
-                Urheilijan kysymys: {user_query}
+                Lisätoive urheilijalta: {lisakysymys}
                 
-                Anna ytimekäs, puhtaasti tähän dataan perustuva fysiologinen analyysi ja ehdotus seuraavista askeleista. 
-                Peilaa suosituksia vahvasti urheilijan kertomaan taustaan ja tavoitteeseen.
+                TEHTÄVÄ:
+                {tehtavananto}
                 """
                 
                 ai_response = model.generate_content(prompt)
                 
-                st.success("Treenihistoria noudettu ja analysoitu onnistuneesti!")
+                st.success("Analyysi suoritettu onnistuneesti!")
                 st.write(ai_response.text)
                 
             except Exception as e:
