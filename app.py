@@ -6,9 +6,9 @@ import json
 
 st.set_page_config(page_title="Tekoälyvalmentaja", page_icon="🏃‍♂️")
 st.title("Tekoälyvalmentaja")
-st.write("Tuo oma Intervals.icu -datasi. Valmentaja analysoi kuormituksesi ja laatii halutessasi 4 viikon ohjelman.")
+st.write("Tuo oma Intervals.icu -datasi. Valmentaja analysoi kuormituksesi ja laatii harjoitusohjelman.")
 
-# 1. AVAIMET JA TUNNUKSET (Kysytään aina käyttäjältä)
+# 1. AVAIMET JA TUNNUKSET
 st.sidebar.subheader("Asetukset")
 api_key = st.sidebar.text_input("Syötä Gemini API-avain", type="password")
 athlete_id = st.sidebar.text_input("Intervals.icu Athlete ID")
@@ -22,24 +22,29 @@ with col1:
 with col2:
     urheilijan_lajit = st.text_input("Lajitausta", placeholder="Esim. Tennis, uinti, kestävyysjuoksu")
 
-urheilijan_tavoite = st.text_input("Päätavoite", placeholder="Esim. Maratonin aikatavoite tai peruskunnon ylläpito")
+urheilijan_tavoite = st.text_input("Päätavoite ja sen ajankohta", placeholder="Esim. Syyskuun maraton tai peruskunnon ylläpito")
 urheilijan_rajoitteet = st.text_input("Aikataulut ja laiterajoitteet (vapaaehtoinen)", 
-                                      placeholder="Esim. Juoksu mieluiten torstai-aamupäivisin ja crossfit lauantai-aamupäivisin.")
+                                      placeholder="Esim. Juoksu mieluiten torstai-aamupäivisin. Kävelymatolla vain kävelyä.")
 
-# 3. TOIMINNON VALINTA
+# 3. TOIMINNON VALINTA (Päivitetty pudotusvalikoksi)
 st.subheader("2. Valitse valmennuksen tyyppi")
-toiminto = st.radio("Mitä haluat valmentajan tekevän?", 
-                    ["Analysoi nykytilanne ja anna lyhyt suositus", 
-                     "Luo 4 viikon harjoitusohjelma"])
+toimintovaihtoehdot = [
+    "Analysoi nykytilanne ja anna lyhyt suositus",
+    "Luo 4 viikon harjoitusohjelma",
+    "Luo 3 kuukauden harjoitusohjelma",
+    "Luo 6 kuukauden harjoitusohjelma",
+    "Luo 12 kuukauden harjoitusohjelma"
+]
+toiminto = st.selectbox("Mitä haluat valmentajan tekevän?", toimintovaihtoehdot)
 
-user_query = st.text_area("Lisäkysymykset tai toiveet (vapaaehtoinen)", 
-                          placeholder="Esim. 'Huomioi, että ensi viikonloppuna en ehdi treenata lainkaan.'")
+user_query = st.text_area("Lisätoiveet tai muutokset ohjelmaan (vapaaehtoinen)", 
+                          placeholder="Esim. 'Loukkasin nilkan, korvaa juoksu uinnilla seuraavat 2 viikkoa.'")
 
 if st.button("Hae data ja luo analyysi"):
     if not api_key or not athlete_id or not intervals_api_key:
         st.error("Syötä kaikki kolme tunnusta vasemman reunan sivupalkkiin!")
     else:
-        with st.spinner('Yhdistetään Intervals.icu-palveluun ja luodaan sisältöä...'):
+        with st.spinner('Yhdistetään Intervals.icu-palveluun ja luodaan valmennussuunnitelmaa...'):
             try:
                 # HAETAAN DATA RAJAPINNASTA
                 tanaan = datetime.now()
@@ -91,34 +96,40 @@ if st.button("Hae data ja luo analyysi"):
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel('gemini-2.5-flash')
                 
-                # Oletusarvot tyhjille kentille
                 tausta_tyo = urheilijan_tyo if urheilijan_tyo else "Ei erikseen määritelty"
                 tausta_lajit = urheilijan_lajit if urheilijan_lajit else "Yleinen liikunta"
                 tausta_tavoite = urheilijan_tavoite if urheilijan_tavoite else "Terveys ja hyvinvointi"
                 tausta_rajoitteet = urheilijan_rajoitteet if urheilijan_rajoitteet else "Ei erityisiä rajoitteita"
                 lisakysymys = user_query if user_query else "Ei lisättyjä toiveita."
                 
-                # Muutetaan tekoälyn tehtävänantoa valinnan mukaan
+                # Dynaaminen promptin rakennus valitun aikajänteen mukaan
                 if toiminto == "Luo 4 viikon harjoitusohjelma":
                     tehtavananto = """
                     Laadi urheilijalle selkeä 4 viikon harjoitusohjelma taulukkomuodossa. 
-                    - Viikko 1 alkaa välittömästi nykyisestä kuormitustilasta. Jos urheilija on ylirasittunut, aloita kevyesti.
-                    - Jaa jokainen viikko päiväkohtaisesti (Maanantai-Sunnuntai).
-                    - Määrittele jokaiselle treenille kesto, laji ja intensiteetti.
-                    - Huomioi ehdottomasti urheilijan tavoite, aikataulurajoitteet ja laitetoiveet.
-                    - Perustele lyhyesti ohjelman lopussa, miksi ohjelma on rytmitetty näin suhteessa pohjakuntoon.
+                    Jaa jokainen viikko päiväkohtaisesti (Maanantai-Sunnuntai).
+                    Määrittele jokaiselle treenille kesto, laji ja intensiteetti.
+                    Huomioi ehdottomasti urheilijan antamat aikataulurajoitteet.
+                    """
+                elif toiminto in ["Luo 3 kuukauden harjoitusohjelma", "Luo 6 kuukauden harjoitusohjelma", "Luo 12 kuukauden harjoitusohjelma"]:
+                    tehtavananto = f"""
+                    Laadi urheilijalle ammattimainen {toiminto.split(' ')[1]} kuukauden harjoitussuunnitelma (makrosykli).
+                    Koska aikajänne on pitkä, älä tee päivätason taulukkoa koko ajalle, vaan toimi näin:
+                    1. Jaa ohjelma selkeisiin harjoituskausiin (esim. peruskuntokausi, voimakausi, kilpailuun valmistava kausi).
+                    2. Määrittele jokaisen kauden päätavoite, kesto ja viikoittainen rytmitys.
+                    3. Rakenna lopuksi yksi eritelty ja tarkka esimerkkiviikko (Maanantai-Sunnuntai) ohjelman ensimmäiselle kaudelle taulukkomuodossa, jotta urheilija tietää, miten aloittaa huomenna.
+                    Huomioi suunnitelmassa urheilijan ilmoittamat tavoitteet ja rajoitteet.
                     """
                 else:
                     tehtavananto = """
-                    Anna ytimekäs, puhtaasti dataan perustuva fysiologinen analyysi ja ehdotus seuraavista askeleista 
-                    (tälle ja huomiselle päivälle). Arvioi akuutin kuorman suhdetta krooniseen pohjaan ja peilaa sitä tavoitteeseen.
+                    Anna ytimekäs, puhtaasti dataan perustuva fysiologinen analyysi nykytilanteesta.
+                    Arvioi akuutin kuorman suhdetta krooniseen pohjaan ja anna ehdotus seuraavien päivien treeneistä tavoitteeseen peilaten.
                     """
                 
                 prompt = f"""
                 Olet ammattitason urheiluvalmentaja. Ota analyysissä aina huomioon urheilijan antamat taustatiedot:
                 - Työ ja elämäntilanne: {tausta_tyo}
                 - Lajivalikoima: {tausta_lajit}
-                - Tavoite: {tausta_tavoite}
+                - Tavoite ja aikataulu: {tausta_tavoite}
                 - Rajoitteet ja aikataulut: {tausta_rajoitteet}
                 
                 Urheilijan reaaliaikainen fysiologinen kuormitusdata:
@@ -128,7 +139,7 @@ if st.button("Hae data ja luo analyysi"):
                 Alla on eriteltynä lista hänen viimeisimmistä harjoituksistaan viimeisen 30 päivän ajalta:
                 {json.dumps(yhteenveto_lista, indent=2)}
                 
-                Lisätoive urheilijalta: {lisakysymys}
+                Lisätoive, tilannepäivitys tai loukkaantuminen: {lisakysymys}
                 
                 TEHTÄVÄ:
                 {tehtavananto}
@@ -136,7 +147,7 @@ if st.button("Hae data ja luo analyysi"):
                 
                 ai_response = model.generate_content(prompt)
                 
-                st.success("Analyysi suoritettu onnistuneesti!")
+                st.success("Suunnitelma laadittu onnistuneesti!")
                 st.write(ai_response.text)
                 
             except Exception as e:
