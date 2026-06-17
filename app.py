@@ -6,7 +6,7 @@ import json
 
 st.set_page_config(page_title="Tekoälyvalmentaja (Chat)", page_icon="💬")
 st.title("Tekoälyvalmentaja 💬")
-st.write("Valmentaja analysoi datasi ja laatii ohjelman. Voit muokata ohjelmaa vapaasti keskustelemalla alareunan chatissa!")
+st.write("Valmentaja analysoi sykemittarisi datan viimeisen kuukauden ajalta, arvioi sen perusteella pohjakunnon sekä akuutin kuormituksen ja laatii halutessasi harjoitusohjelman. Voit muokata ohjelmaa vapaasti keskustelemalla alareunan chatissa.")
 
 # 1. AVAIMET JA ASETUKSET SIVUPALKISSA
 st.sidebar.subheader("1. Asetukset & Taustatiedot")
@@ -140,7 +140,7 @@ for message in st.session_state.messages:
 
 # 5. KÄYTTÄJÄN SYÖTEKEHOTE (Vapaa juttelu)
 if st.session_state.chat is None:
-    st.info("👈 Täytä taustatiedot sivupalkkiin ja klikkaa 'Päivitä data ja suorita tehtävä'!")
+    st.info("👈 Täytä taustatiedot sivupalkkiin ja klikkaa 'Päivitä data ja suorita tehtävä'")
 else:
     prompt = st.chat_input("Kirjoita viesti valmentajalle (esim. korjaa ohjelmaa tai esitä kysymys)...")
     if prompt:
